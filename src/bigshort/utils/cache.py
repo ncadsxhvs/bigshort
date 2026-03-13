@@ -16,6 +16,7 @@ def _cache_path(key: str) -> Path:
 def save_cache(key: str, df: pd.DataFrame) -> None:
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     df.to_parquet(_cache_path(key))
+    df.to_csv(CACHE_DIR / f"{key}.csv")
 
 
 def load_cache(key: str) -> pd.DataFrame | None:
