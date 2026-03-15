@@ -1,9 +1,10 @@
-"""DataAgent — fetches OHLCV, writes to MarketStore, emits events."""
+"""DataAgent — fetches OHLCV + FRED data, writes to MarketStore, emits events."""
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from typing import Any
 
 from bigshort.core.agent import Agent
@@ -52,13 +53,20 @@ class DataAgent(Agent):
     def run_batch(self, data: dict[str, Any]) -> Any:
         start = data.get("start", config.DEFAULT_START)
         end = data.get("end", config.DEFAULT_END)
+
+        # YFinance data
         frames = {}
         for key, ticker in self._assets.items():
             frames[key] = self._source.fetch(ticker, start=start, end=end)
         aligned = align_to_trading_calendar(frames, reference_key="ndx")
         for key, df in aligned.items():
             self._store.append(key, df)
-        return {"tickers": list(aligned.keys())}
+
+        # FRED data
+        fred_keys = self._fetch_fred(start, end)
+
+        all_keys = list(aligned.keys()) + fred_keys
+        return {"tickers": all_keys}
 
     def _fetch_and_store(self) -> list[str]:
         frames = {}
@@ -67,4 +75,24 @@ class DataAgent(Agent):
         aligned = align_to_trading_calendar(frames, reference_key="ndx")
         for key, df in aligned.items():
             self._store.append(key, df)
-        return list(aligned.keys())
+
+        fred_keys = self._fetch_fred(config.DEFAULT_START)
+        return list(aligned.keys()) + fred_keys
+
+    def _fetch_fred(self, start: str, end: str | None = None) -> list[str]:
+        """Fetch FRED series if API key is available."""
+        from bigshort import config as _  # noqa: ensure dotenv loaded
+        if not os.environ.get("FRED_API_KEY"):
+            logger.debug("FRED_API_KEY not set, skipping FRED data")
+            return []
+        try:
+            from bigshort.data.fred import FredSource
+            fred = FredSource()
+            frames = fred.fetch_all(start=start, end=end)
+            for key, df in frames.items():
+                self._store.append(key, df)
+            logger.info("FRED: loaded %s", ", ".join(frames.keys()))
+            return list(frames.keys())
+        except Exception:
+            logger.exception("FRED fetch failed")
+            return []

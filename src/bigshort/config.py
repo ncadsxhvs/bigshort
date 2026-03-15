@@ -5,6 +5,10 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 # Default ticker map — overridable via CLI --tickers
 DEFAULT_TICKERS: dict[str, str] = {
     "ndx": "^NDX",
@@ -20,7 +24,7 @@ VIX_TICKER = DEFAULT_TICKERS["vix"]
 GVZ_TICKER = DEFAULT_TICKERS["gvz"]
 
 # Date range defaults
-DEFAULT_START = "2018-01-01"
+DEFAULT_START = "2020-01-01"
 DEFAULT_END = None  # None → today
 
 # Paths
